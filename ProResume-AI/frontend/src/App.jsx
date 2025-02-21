@@ -269,7 +269,7 @@ export default function ResumeAnalyzer() {
                   {results?.score?.total}{" "}
                   <span className="text-lg sm:text-xl">/ 100</span>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                   {results?.score?.breakdown &&
                     Object.entries(results.score.breakdown).map(
                       ([key, value]) => {

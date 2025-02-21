@@ -204,9 +204,9 @@ const cors = require("cors");
 const multer = require("multer");
 const pdf = require("pdf-parse");
 const fetch = require("node-fetch");
-const linkedIn = require("linkedin-jobs-api");
 const { INDUSTRY_BENCHMARKS } = require("./industry_benchmarks");
 const ATS_KEYWORDS = require("./ats_keywords");
+const { query } = require("./web-scrape");
 const app = express();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
@@ -241,7 +241,7 @@ function scaleScores(rawScores) {
 }
 async function searchJobs(queryOptions) {
   try {
-    const response = await linkedIn.query(queryOptions);
+    const response = await query(queryOptions);
     return response;
   } catch (error) {
     console.error("Error searching jobs:", error);
@@ -374,7 +374,7 @@ ${text}
         model: "command-r-plus",
         prompt: prompt,
         max_tokens: 4000,
-        temperature: 0.8,
+        temperature: 0.7,
       }),
     });
     if (!response.ok) {
@@ -415,7 +415,11 @@ ${text}
       limit: 5,
       page: "0",
     };
-    if (analysis.location != null) {
+    if (
+      analysis.location != null ||
+      analysis.location != "Unspecified" ||
+      analysis.skills_analysis.strong_skills
+    ) {
       const jobSearchResults = await searchJobs(jobQuery);
       analysis.job_search_results = jobSearchResults;
     }
