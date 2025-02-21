@@ -48,24 +48,15 @@ function Query(queryObj) {
   this.host = queryObj.host || "www.linkedin.com";
   this.keyword = queryObj.keyword?.trim().replace(/\s+/g, "+") || "";
   this.location = queryObj.location?.trim().replace(/\s+/g, "+") || "";
-  this.dateSincePosted = queryObj.dateSincePosted || "";
-  this.jobType = queryObj.jobType || "";
-  this.remoteFilter = queryObj.remoteFilter || "";
-  this.salary = queryObj.salary || "";
+  //   this.dateSincePosted = queryObj.dateSincePosted || "";
+  //   this.jobType = queryObj.jobType || "";
+  //   this.remoteFilter = queryObj.remoteFilter || "";
+  //   this.salary = queryObj.salary || "";
   this.experienceLevel = queryObj.experienceLevel || "";
-  this.sortBy = queryObj.sortBy || "";
+  //   this.sortBy = queryObj.sortBy || "";
   this.limit = Number(queryObj.limit) || 0;
   this.page = Number(queryObj.page) || 0;
 }
-
-Query.prototype.getDateSincePosted = function () {
-  const dateRange = {
-    "past month": "r2592000",
-    "past week": "r604800",
-    "24hr": "r86400",
-  };
-  return dateRange[this.dateSincePosted.toLowerCase()] || "";
-};
 
 Query.prototype.getExperienceLevel = function () {
   const experienceRange = {
@@ -78,42 +69,6 @@ Query.prototype.getExperienceLevel = function () {
   };
   return experienceRange[this.experienceLevel.toLowerCase()] || "";
 };
-
-Query.prototype.getJobType = function () {
-  const jobTypeRange = {
-    "full time": "F",
-    "full-time": "F",
-    "part time": "P",
-    "part-time": "P",
-    contract: "C",
-    temporary: "T",
-    volunteer: "V",
-    internship: "I",
-  };
-  return jobTypeRange[this.jobType.toLowerCase()] || "";
-};
-
-Query.prototype.getRemoteFilter = function () {
-  const remoteFilterRange = {
-    "on-site": "1",
-    "on site": "1",
-    remote: "2",
-    hybrid: "3",
-  };
-  return remoteFilterRange[this.remoteFilter.toLowerCase()] || "";
-};
-
-Query.prototype.getSalary = function () {
-  const salaryRange = {
-    40000: "1",
-    60000: "2",
-    80000: "3",
-    100000: "4",
-    120000: "5",
-  };
-  return salaryRange[this.salary] || "";
-};
-
 Query.prototype.getPage = function () {
   return this.page * 25;
 };
@@ -125,18 +80,12 @@ Query.prototype.url = function (start) {
 
   if (this.keyword) params.append("keywords", this.keyword);
   if (this.location) params.append("location", this.location);
-  if (this.getDateSincePosted())
-    params.append("f_TPR", this.getDateSincePosted());
-  if (this.getSalary()) params.append("f_SB2", this.getSalary());
   if (this.getExperienceLevel())
     params.append("f_E", this.getExperienceLevel());
-  if (this.getRemoteFilter()) params.append("f_WT", this.getRemoteFilter());
-  if (this.getJobType()) params.append("f_JT", this.getJobType());
-
   params.append("start", start + this.getPage());
 
-  if (this.sortBy === "recent") params.append("sortBy", "DD");
-  else if (this.sortBy === "relevant") params.append("sortBy", "R");
+  //   if (this.sortBy === "recent") params.append("sortBy", "DD");
+  //   else if (this.sortBy === "relevant") params.append("sortBy", "R");
 
   return query + params.toString();
 };
