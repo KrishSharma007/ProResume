@@ -205,6 +205,8 @@ const multer = require("multer");
 const pdf = require("pdf-parse");
 const fetch = require("node-fetch");
 const linkedIn = require("linkedin-jobs-api");
+const { INDUSTRY_BENCHMARKS } = require("./industry_benchmarks");
+const ATS_KEYWORDS = require("./ats_keywords");
 const app = express();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
@@ -214,9 +216,11 @@ app.use(express.json());
 const MAX_LIMITS = {
   skills: 25,
   experience: 25,
-  achievements: 20,
-  format: 15,
-  education: 15,
+  achievements: 25,
+  education: 25,
+  ats_compatibility: 100,
+  diversity_inclusion: 100,
+  industry_benchmark: 100,
 };
 function scaleScores(rawScores) {
   let scaledScores = {};
@@ -226,8 +230,12 @@ function scaleScores(rawScores) {
     let raw = rawScores[key];
     let maxLimit = MAX_LIMITS[key];
     let scaled = Math.round((raw / 100) * maxLimit);
-    scaledScores[key] = scaled;
-    totalScore += scaled;
+    if (!["ats_compatibility", "industry_benchmark"].includes(key)) {
+      scaledScores[key] = scaled;
+      totalScore += scaled;
+    } else {
+      scaledScores[key] = raw;
+    }
   });
   return { scaledScores, totalScore };
 }
@@ -253,72 +261,109 @@ app.post("/analyze", upload.single("resume"), async (req, res) => {
     if (!text) {
       return res.status(400).json({ error: "Unable to extract text from PDF" });
     }
-    const prompt = `
-    As a senior career coach and resume analyst with 20 years of experience in talent acquisition and career development, analyze the following resume. Follow these exact guidelines without deviation. Your analysis must be structured only in the JSON format provided below. Do not include any additional text, comments, or explanations outside of the JSON response.
+    const createAnalysisPrompt = (text, industryBenchmarks, atsKeywords) => {
+      const benchmarksStr = JSON.stringify(industryBenchmarks, null, 2);
+      const keywordsStr = JSON.stringify(atsKeywords, null, 2);
+      return `
+As a senior career coach and resume analyst with 20 years of experience in talent acquisition and career development, analyze the following resume. Follow these **STRICT** instructions without deviation. **DO NOT** include any text outside the JSON format.
 
-    ### **Scoring Rules:**
-    - **Evaluate all categories out of 100.**
-    - Do **NOT** adjust them to fit any predefined limit. We will scale them mathematically.
+### **Scoring Rules:**
+- **Evaluate all categories out of 100.**
+- Compare against industry benchmarks for the candidate's level.
+- Analyze ATS keyword matches against industry standards.
+- Evaluate against diversity and inclusion guidelines.
 
-    ### **STRICT Output Rules**
-    - **DO NOT** include any fields outside of the required JSON structure.
-    - **detailed_feedback** must always be present with meaningful insights.
-    - Ensure all sections have valid JSON structure and correct data types.
-    - **DO NOT** add extra comments, explanations, or text outside the JSON.
+### **Reference Data:**
+## Industry Benchmarks:
+(Raw text for AI, do not interpret as code)
+${benchmarksStr}
 
-    ### **Expected JSON Output Format:**
-    {
-      "score": {
-        "total": <0-100>, 
-        "breakdown": {
-          "skills": <0-100>, 
-          "experience": <0-100>, 
-          "achievements": <0-100>, 
-          "format": <0-100>, 
-          "education": <0-100>
-        }
-      },
-      "roles": [
-        {
-          "title": "<role title>", 
-          "match_percentage": <0-100>,
-          "key_qualifications": ["<qual1>", "<qual2>", "<qual3>"]
-        }
-      ],
-      "skills_analysis": {
-        "strong_skills": ["<skill1>", "<skill2>", "<skill3>"],
-        "missing_skills": ["<skill1>", "<skill2>", "<skill3>"],
-        "improvement_areas": ["<area1>", "<area2>", "<area3>"]
-      },
-      "detailed_feedback": {
-        "strengths": ["<strength1>", "<strength2>", "<strength3>"],
-        "weaknesses": ["<weakness1>", "<weakness2>", "<weakness3>"],
-        "improvement_tips": ["<tip1>", "<tip2>", "<tip3>", "<tip4>", "<tip5>"]
-      },
-      "location": "<location extracted from resume>",
-      "experience_level": "<experience level extracted or inferred from resume>",
-      "salary_insights": {
-        "estimated_salary_range": {
-          "low": <salary_low>,
-          "high": <salary_high>,
-          "currency": "<currency>"
-        },
-        "salary_factors": ["<factor1>", "<factor2>", "<factor3>"]
-      }
+## ATS Keywords by Industry:
+(Raw text for AI, do not interpret as code)
+${keywordsStr}
+
+### **Expected JSON Output Format (STRICT)**:
+{
+  "score": {
+    "total": <0-100>,
+    "breakdown": {
+      "skills": <0-100>,
+      "experience": <0-100>,
+      "achievements": <0-100>,
+      "education": <0-100>,
+      "ats_compatibility": <0-100>,
+      "industry_benchmark": <0-100>
     }
+  },
+  "industry_analysis": {
+    "industry": "<detected industry>",
+    "experience_level": "<junior/mid/senior>",
+    "benchmark_comparison": {
+      "average_score": <industry average score>,
+      "percentile_ranking": <percentile>,
+      "key_differentiators_present": ["<differentiator1>", "<differentiator2>"],
+      "key_differentiators_missing": ["<differentiator1>", "<differentiator2>"],
+      "industry_skills_present": ["<skill1>", "<skill2>"],
+      "industry_skills_missing": ["<skill1>", "<skill2>"]
+    }
+  },
+  "ats_analysis": {
+    "keyword_match_score": <0-100>,
+    "keywords_found": ["<keyword1>", "<keyword2>"],
+    "missing_critical_keywords": ["<keyword1>", "<keyword2>"],
+    "keyword_frequency": {
+      "<keyword1>": <count>,
+      "<keyword2>": <count>
+    }
+  },
+  "roles": [
+    {
+      "title": "<role title>",
+      "match_percentage": <0-100>,
+      "key_qualifications": ["<qual1>", "<qual2>", "<qual3>"]
+    }
+  ],
+  "skills_analysis": {
+    "strong_skills": ["<skill1>", "<skill2>", "<skill3>"],
+    "missing_skills": ["<skill1>", "<skill2>", "<skill3>"],
+    "improvement_areas": ["<area1>", "<area2>", "<area3>"]
+  },
+  "detailed_feedback": {
+    "strengths": ["<strength1>", "<strength2>", "<strength3>"],
+    "weaknesses": ["<weakness1>", "<weakness2>", "<weakness3>"],
+    "improvement_tips": ["<tip1>", "<tip2>", "<tip3>", "<tip4>", "<tip5>"]
+  },
+  "location": "<location extracted from resume>",
+  "experience_level": "<experience level extracted or inferred from resume>",
+  "salary_insights": {
+    "estimated_salary_range": {
+      "low": <salary_low>,
+      "high": <salary_high>,
+      "currency": "<currency>"
+    },
+    "salary_factors": ["<factor1>", "<factor2>", "<factor3>"]
+  }
+}
 
-    ### **Resume Content for Analysis:** 
-    ${text}
+### **Resume Content for Analysis:**
+${text}
 
-    **Final Instructions:**
-    - **Ensure all breakdown scores are out of 100.**
-    - **Do NOT scale them down—we will handle that separately.**
-    - **Ensure all fields match the expected JSON structure.**
-    - **Extract the location dynamically from the resume text.**
-    - **Use AI to deduce the experience level, relevant skills, and other job-related attributes from the resume text.**
-    - **Provide realistic salary insights based on the user's location, skills, and experience.**
-    - **Search for jobs based on the extracted location, experience level, and skills.**
-    `;
+### **Final Instructions:**
+- **Your response MUST be ONLY valid JSON without any extra text, comments, or explanations.**
+- **Ensure ALL score breakdowns are between 0-100.**
+- **Provide unbiased and fair analysis based on industry benchmarks.**
+- **Extract the candidate location from the resume.**
+- **Detect missing critical skills & keywords.**
+- **Generate personalized recommendations.**
+`;
+    };
+
+    // Usage example:
+    const prompt = createAnalysisPrompt(
+      text,
+      INDUSTRY_BENCHMARKS,
+      ATS_KEYWORDS
+    );
     const response = await fetch("https://api.cohere.ai/v1/generate", {
       method: "POST",
       headers: {
@@ -328,8 +373,8 @@ app.post("/analyze", upload.single("resume"), async (req, res) => {
       body: JSON.stringify({
         model: "command-r-plus",
         prompt: prompt,
-        max_tokens: 2000,
-        temperature: 0.7,
+        max_tokens: 4000,
+        temperature: 0.8,
       }),
     });
     if (!response.ok) {

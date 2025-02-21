@@ -273,12 +273,17 @@ export default function ResumeAnalyzer() {
                   {results?.score?.breakdown &&
                     Object.entries(results.score.breakdown).map(
                       ([key, value]) => {
+                        if (
+                          key == "ats_compatibility" ||
+                          key == "industry_benchmark"
+                        ) {
+                          return;
+                        }
                         const maxScores = {
                           skills: 25,
                           experience: 25,
-                          achievements: 20,
-                          format: 15,
-                          education: 15,
+                          achievements: 25,
+                          education: 25,
                         };
 
                         const maxScore = maxScores[key];
@@ -309,7 +314,256 @@ export default function ResumeAnalyzer() {
                     )}
                 </div>
               </div>
+              {/* Industry Benchmarks Section */}
+              <div className="bg-black rounded-2xl p-4 sm:p-8 text-white mt-8">
+                <h2 className="text-2xl sm:text-3xl font-bold mb-4">
+                  Industry Benchmarks
+                </h2>
+                <div className="text-4xl sm:text-5xl font-bold text-purple-300 ">
+                  {results?.score?.breakdown.industry_benchmark}{" "}
+                  <span className="text-lg sm:text-xl">/ 100</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-4 mb-8">
+                  <div className="w-full bg-neutral-800 h-2 rounded-lg overflow-hidden">
+                    <div
+                      className="h-full bg-purple-400 rounded-lg"
+                      style={{
+                        width: `${
+                          (results?.score?.breakdown.industry_benchmark / 100) *
+                          100
+                        }%`,
+                      }}
+                    ></div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="bg-purple-900/20 p-4 rounded-xl border border-purple-300/20">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-purple-300">Industry</span>
+                        <span className="capitalize font-medium text-purple-200">
+                          {results?.industry_analysis?.industry}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-purple-300">
+                          Experience Level
+                        </span>
+                        <span className="capitalize font-medium text-purple-200">
+                          {results?.industry_analysis?.experience_level}
+                        </span>
+                      </div>
+                    </div>
 
+                    <div className="bg-purple-900/20 p-4 rounded-xl border border-purple-300/20">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-purple-300">
+                          Average Industry Score
+                        </span>
+                        <span className="font-medium text-purple-200">
+                          {
+                            results?.industry_analysis?.benchmark_comparison
+                              ?.average_score
+                          }
+                        </span>
+                      </div>
+                      {/* <div className="flex justify-between items-center">
+                        <span className="text-purple-300">Your Percentile</span>
+                        <span className="font-medium text-purple-200">
+                          {
+                            results?.industry_analysis?.benchmark_comparison
+                              ?.percentile_ranking
+                          }
+                          th
+                        </span>
+                      </div> */}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-lg text-green-400 font-semibold mb-2">
+                        Present Industry Skills
+                      </h3>
+                      <div className="space-y-2">
+                        {results?.industry_analysis?.benchmark_comparison?.industry_skills_present.map(
+                          (skill, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2 text-purple-300"
+                            >
+                              <Star className="w-5 h-5 text-purple-400" />
+                              <span>{skill}</span>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-lg text-red-400 font-semibold mb-2">
+                        Missing Industry Skills
+                      </h3>
+                      <div className="space-y-2">
+                        {results?.industry_analysis?.benchmark_comparison?.industry_skills_missing.map(
+                          (skill, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2 text-purple-300"
+                            >
+                              <Star className="w-5 h-5 text-purple-400" />
+                              <span>{skill}</span>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* ATS Analysis Section */}
+              <div className="bg-black rounded-2xl p-4 sm:p-8 text-white mt-8">
+                <h2 className="text-2xl sm:text-3xl font-bold mb-4">
+                  ATS Analysis
+                </h2>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div className="bg-purple-900/20 p-4 rounded-xl border border-purple-300/20">
+                      <h3 className="text-xl font-semibold mb-4">
+                        Keyword Match Score
+                      </h3>
+                      <div className="relative pt-4">
+                        <div className="text-4xl font-bold text-purple-300 mb-2">
+                          {results?.ats_analysis?.keyword_match_score}%
+                        </div>
+                        <div className="w-full bg-neutral-800 h-3 rounded-lg overflow-hidden">
+                          <div
+                            className="h-full bg-purple-400 rounded-lg"
+                            style={{
+                              width: `${results?.ats_analysis?.keyword_match_score}%`,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-purple-900/20 p-4 rounded-xl border border-purple-300/20">
+                      <h3 className="text-xl font-semibold mb-4">
+                        Keyword Frequency
+                      </h3>
+                      <div className="space-y-2">
+                        {Object.entries(
+                          results?.ats_analysis?.keyword_frequency || {}
+                        ).map(([keyword, frequency]) => (
+                          <div
+                            key={keyword}
+                            className="flex justify-between items-center"
+                          >
+                            <span className="text-purple-300">{keyword}</span>
+                            <span className="font-medium text-purple-200">
+                              {frequency}x
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <h3 className="text-lg text-green-400 font-semibold mb-2">
+                        Keywords Found
+                      </h3>
+                      <div className="space-y-2">
+                        {results?.ats_analysis?.keywords_found.map(
+                          (keyword, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2 text-purple-300"
+                            >
+                              <Star className="w-5 h-5 text-purple-400" />
+                              <span>{keyword}</span>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-lg text-red-400 font-semibold mb-2">
+                        Missing Keywords
+                      </h3>
+                      <div className="space-y-2">
+                        {results?.ats_analysis?.missing_critical_keywords.map(
+                          (keyword, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-2 text-purple-300"
+                            >
+                              <Star className="w-5 h-5 text-purple-400" />
+                              <span>{keyword}</span>
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Salary Insights Section */}
+              <div className="bg-black rounded-2xl p-4 sm:p-8 text-white mt-8">
+                <h2 className="text-2xl sm:text-3xl font-bold mb-4">
+                  Salary Insights
+                </h2>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="bg-purple-900/20 p-4 rounded-xl border border-purple-300/20">
+                    <h3 className="text-xl font-semibold mb-4">
+                      Estimated Salary Range
+                    </h3>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-purple-300">Low</span>
+                        <span className="font-medium text-purple-200">
+                          {
+                            results?.salary_insights?.estimated_salary_range
+                              ?.currency
+                          }{" "}
+                          {results?.salary_insights?.estimated_salary_range?.low?.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-purple-300">High</span>
+                        <span className="font-medium text-purple-200">
+                          {
+                            results?.salary_insights?.estimated_salary_range
+                              ?.currency
+                          }{" "}
+                          {results?.salary_insights?.estimated_salary_range?.high?.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-purple-900/20 p-4 rounded-xl border border-purple-300/20">
+                    <h3 className="text-xl font-semibold mb-4">
+                      Salary Factors
+                    </h3>
+                    <div className="space-y-2">
+                      {results?.salary_insights?.salary_factors.map(
+                        (factor, idx) => (
+                          <div
+                            key={idx}
+                            className="flex items-center gap-2 text-purple-300"
+                          >
+                            <Star className="w-5 h-5 text-purple-400" />
+                            <span>{factor}</span>
+                          </div>
+                        )
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
               {/* Recommended Roles*/}
               {results?.roles?.length > 0 && (
                 <div className="bg-black rounded-2xl p-4 sm:p-8 text-white mt-8">

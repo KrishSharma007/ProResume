@@ -5,21 +5,25 @@ ProResume AI is an intelligent resume analysis platform that helps job seekers o
 ## ✨ Features
 
 ### 🎯 Resume Analysis
+
 - Detailed scoring system with weighted categories
 - Overall resume score out of 100
 - Breakdown across skills, experience, achievements, format, and education
 
 ### 🔍 Skills Assessment
+
 - Identification of strong skills
 - Gap analysis for missing critical skills
 - Targeted improvement recommendations
 
 ### 💼 Career Insights
+
 - Role recommendations with match percentages
 - Key qualification mapping
 - Salary insights based on experience and location
 
 ### 📊 Job Market Integration
+
 - Real-time job listings via LinkedIn API
 - Location-based job matching
 - Detailed company and position information
@@ -27,29 +31,34 @@ ProResume AI is an intelligent resume analysis platform that helps job seekers o
 ## 🚀 Tech Stack
 
 ### Frontend
+
 - React
 - Tailwind CSS
 - Lucide Icons
 - Canvas animations
 
 ### Backend
+
 - Express.js
 - Node.js
 - Multer for file handling
 - PDF-parse for document processing
 
 ### APIs
+
 - Cohere AI for resume analysis
 - LinkedIn Jobs API for job matching
 
 ## 🛠️ Installation
 
 1. Clone the repository
+
 ```bash
 git clone https://github.com/yourusername/proresume-ai.git
 ```
 
 2. Install dependencies for both frontend and backend
+
 ```bash
 # Install backend dependencies
 cd backend
@@ -61,6 +70,7 @@ npm install
 ```
 
 3. Create environment variables
+
 ```bash
 # Backend .env
 COHERE_API_KEY=your_cohere_api_key
@@ -71,6 +81,7 @@ VITE_API_URL=http://localhost:8080/analyze
 ```
 
 4. Start the development servers
+
 ```bash
 # Start backend server
 cd backend
@@ -117,4 +128,4 @@ proresume-ai/
 
 ---
 
-Built with ❤️ by Krish
+Built with ❤️ by RuntimeTerrors
