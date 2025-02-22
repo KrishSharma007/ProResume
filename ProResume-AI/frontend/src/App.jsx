@@ -317,7 +317,7 @@ export default function ResumeAnalyzer() {
               {/* Industry Benchmarks Section */}
               <div className="bg-black rounded-2xl p-4 sm:p-8 text-white mt-8">
                 <h2 className="text-2xl sm:text-3xl font-bold mb-4">
-                  Industry Benchmarks
+                  Company Benchmarks
                 </h2>
                 <div className="text-4xl sm:text-5xl font-bold text-purple-300 ">
                   {results?.score?.breakdown.industry_benchmark}{" "}
