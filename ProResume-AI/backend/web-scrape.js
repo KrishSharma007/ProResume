@@ -84,7 +84,7 @@ Query.prototype.url = function (start) {
     params.append("f_E", this.getExperienceLevel());
   params.append("start", start + this.getPage());
 
-  //   if (this.sortBy === "recent") params.append("sortBy", "DD");
+  params.append("sortBy", "DD");
   //   else if (this.sortBy === "relevant") params.append("sortBy", "R");
 
   return query + params.toString();

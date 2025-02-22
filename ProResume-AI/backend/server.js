@@ -10,7 +10,7 @@ const { query } = require("./web-scrape");
 const app = express();
 const storage = multer.memoryStorage();
 const upload = multer({ storage: storage });
-app.use(cors());
+app.use(cors({ origin: "*" }));
 app.use(express.json());
 
 const MAX_LIMITS = {
