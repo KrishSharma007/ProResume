@@ -99,7 +99,7 @@ const Loader = () => (
         </div>
         <div className="text-lg sm:text-xl text-purple-200">
           Analyzing your resume... <br />
-          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; RuntimeTerrors 🥷
+          &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Made with ❤️ by -Mayank 🥷
         </div>
       </div>
     </div>
