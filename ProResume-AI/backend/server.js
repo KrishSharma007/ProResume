@@ -3,86 +3,85 @@ const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const pdf = require("pdf-parse");
-const fetch = require("node-fetch");
+const OpenAI = require("openai");
 const { INDUSTRY_BENCHMARKS } = require("./industry_benchmarks");
 const ATS_KEYWORDS = require("./ats_keywords");
 const { query } = require("./web-scrape");
+
 const app = express();
+
+// --- IMPROVED CONFIGURATION ---
+// 1. Security: Limit file size to 5MB and force PDF type
 const storage = multer.memoryStorage();
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === "application/pdf") {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Only PDF is allowed."), false);
+    }
+  },
+});
+
 app.use(cors({ origin: "*" }));
 app.use(express.json());
 
-const MAX_LIMITS = {
-  skills: 25,
-  experience: 25,
-  achievements: 25,
-  education: 25,
-  ats_compatibility: 100,
-  diversity_inclusion: 100,
-  industry_benchmark: 100,
-};
-function scaleScores(rawScores) {
+const client = new OpenAI({
+  baseURL: process.env.LLM_BASE_URL || undefined,
+  apiKey: process.env.LLM_API_KEY,
+});
+
+const LLM_MODEL = process.env.LLM_MODEL || "gpt-4o";
+
+// --- HELPER FUNCTIONS ---
+function calculateWeightedScores(breakdown = {}) {
+  const weights = {
+    skills: 25,
+    experience: 25,
+    achievements: 25,
+    education: 25,
+  };
+
   let scaledScores = {};
   let totalScore = 0;
 
-  Object.keys(rawScores).forEach((key) => {
-    let raw = rawScores[key];
-    let maxLimit = MAX_LIMITS[key];
-    let scaled = Math.round((raw / 100) * maxLimit);
-    if (!["ats_compatibility", "industry_benchmark"].includes(key)) {
-      scaledScores[key] = scaled;
-      totalScore += scaled;
-    } else {
-      scaledScores[key] = raw;
-    }
-  });
+  for (const [key, weight] of Object.entries(weights)) {
+    const raw = breakdown[key] || 0;
+    const scaled = Math.round((raw / 100) * weight);
+    scaledScores[key] = scaled;
+    totalScore += scaled;
+  }
+
+  scaledScores.ats_compatibility = breakdown.ats_compatibility || 0;
+  scaledScores.industry_benchmark = breakdown.industry_benchmark || 0;
+
   return { scaledScores, totalScore };
 }
-async function searchJobs(queryOptions) {
-  try {
-    const response = await query(queryOptions);
-    return response;
-  } catch (error) {
-    console.error("Error searching jobs:", error);
-    return [];
-  }
+
+// 2. Robustness: Clean markdown formatting from AI responses
+function cleanJson(text) {
+  if (!text) return "";
+  // Remove ```json and ``` fences if present
+  return text
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/, "");
 }
 
-app.post("/analyze", upload.single("resume"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
-    }
-
-    const data = await pdf(req.file.buffer);
-    const text = data.text.trim();
-
-    if (!text) {
-      return res.status(400).json({ error: "Unable to extract text from PDF" });
-    }
-    const createAnalysisPrompt = (text, industryBenchmarks, atsKeywords) => {
-      const benchmarksStr = JSON.stringify(industryBenchmarks, null, 2);
-      const keywordsStr = JSON.stringify(atsKeywords, null, 2);
-      return `
-As a senior career coach and resume analyst with 20 years of experience in talent acquisition and career development, analyze the following resume. Follow these **STRICT** instructions without deviation. **DO NOT** include any text outside the JSON format.
+// --- PROMPTS ---
+const SYSTEM_PROMPT = `
+You are a senior career coach and resume analyst.
+Your goal is to analyze resumes against industry benchmarks and ATS standards.
 
 ### **Scoring Rules:**
 - **Evaluate all categories out of 100.**
 - Compare against industry benchmarks for the candidate's level.
 - Analyze ATS keyword matches against industry standards.
-- Evaluate against diversity and inclusion guidelines.
-
-### **Reference Data:**
-## Industry Benchmarks:
-(Raw text for AI, do not interpret as code)
-${benchmarksStr}
-
-## ATS Keywords by Industry:
-(Raw text for AI, do not interpret as code)
-${keywordsStr}
 
 ### **Expected JSON Output Format (STRICT)**:
+You must output ONLY valid JSON.
 {
   "score": {
     "total": <0-100>,
@@ -96,144 +95,183 @@ ${keywordsStr}
     }
   },
   "industry_analysis": {
-    "industry": "<detected industry>",
+    "industry": "<string>",
     "experience_level": "<junior/mid/senior>",
     "benchmark_comparison": {
-      "average_score": <industry average score>,
-      "percentile_ranking": <percentile>,
-      "key_differentiators_present": ["<differentiator1>", "<differentiator2>"],
-      "key_differentiators_missing": ["<differentiator1>", "<differentiator2>"],
-      "industry_skills_present": ["<skill1>", "<skill2>"],
-      "industry_skills_missing": ["<skill1>", "<skill2>"]
+      "average_score": <number>,
+      "percentile_ranking": <number>,
+      "key_differentiators_present": ["<string>"],
+      "key_differentiators_missing": ["<string>"],
+      "industry_skills_present": ["<string>"],
+      "industry_skills_missing": ["<string>"]
     }
   },
   "ats_analysis": {
-    "keyword_match_score": <0-100>,
-    "keywords_found": ["<keyword1>", "<keyword2>"],
-    "missing_critical_keywords": ["<keyword1>", "<keyword2>"],
-    "keyword_frequency": {
-      "<keyword1>": <count>,
-      "<keyword2>": <count>
-    }
+    "keyword_match_score": <number>,
+    "keywords_found": ["<string>"],
+    "missing_critical_keywords": ["<string>"],
+    "keyword_frequency": { "<keyword>": <number> }
   },
   "roles": [
     {
-      "title": "<role title>",
-      "match_percentage": <0-100>,
-      "key_qualifications": ["<qual1>", "<qual2>", "<qual3>"]
+      "title": "<string>",
+      "match_percentage": <number>,
+      "key_qualifications": ["<string>"]
     }
   ],
   "skills_analysis": {
-    "strong_skills": ["<skill1>", "<skill2>", "<skill3>"],
-    "missing_skills": ["<skill1>", "<skill2>", "<skill3>"],
-    "improvement_areas": ["<area1>", "<area2>", "<area3>"]
+    "strong_skills": ["<string>"],
+    "missing_skills": ["<string>"],
+    "improvement_areas": ["<string>"]
   },
   "detailed_feedback": {
-    "strengths": ["<strength1>", "<strength2>", "<strength3>"],
-    "weaknesses": ["<weakness1>", "<weakness2>", "<weakness3>"],
-    "improvement_tips": ["<tip1>", "<tip2>", "<tip3>", "<tip4>", "<tip5>"]
+    "strengths": ["<string>"],
+    "weaknesses": ["<string>"],
+    "improvement_tips": ["<string>"]
   },
-  "location": "<location extracted from resume>",
-  "experience_level": "<experience level extracted or inferred from resume>",
+  "location": "<string>",
+  "experience_level": "<string>",
   "salary_insights": {
     "estimated_salary_range": {
-      "low": <salary_low>,
-      "high": <salary_high>,
-      "currency": "<currency>"
+      "low": <number>,
+      "high": <number>,
+      "currency": "<string>"
     },
-    "salary_factors": ["<factor1>", "<factor2>", "<factor3>"]
+    "salary_factors": ["<string>"]
   }
-}
+}`;
 
-### **Resume Content for Analysis:**
-${text}
+// --- ROUTES ---
 
-### **Final Instructions:**
-- **Your response MUST be ONLY valid JSON without any extra text, comments, or explanations.**
-- **Ensure ALL score breakdowns are between 0-100.**
-- **Provide unbiased and fair analysis based on industry benchmarks.**
-- **Extract the candidate location from the resume.**
-- **Detect missing critical skills & keywords.**
-- **Generate personalized recommendations.**
-`;
-    };
+// 3. Robustness: Wrapper to handle Multer errors gracefully
+const uploadMiddleware = (req, res, next) => {
+  upload.single("resume")(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      // A Multer error occurred when uploading (e.g. file too large)
+      return res.status(400).json({ error: `Upload error: ${err.message}` });
+    } else if (err) {
+      // An unknown error occurred or file type check failed
+      return res.status(400).json({ error: err.message });
+    }
+    // Everything went fine
+    next();
+  });
+};
 
-    // Usage example:
-    const prompt = createAnalysisPrompt(
-      text,
-      INDUSTRY_BENCHMARKS,
-      ATS_KEYWORDS
-    );
-    const response = await fetch("https://api.cohere.ai/v1/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.COHERE_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "command-r-plus",
-        prompt: prompt,
-        max_tokens: 4000,
-        temperature: 0.7,
-      }),
+app.post("/analyze", uploadMiddleware, async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    // 1. PDF Parsing
+    const data = await pdf(req.file.buffer);
+    const text = data.text.trim();
+    if (!text)
+      return res
+        .status(400)
+        .json({
+          error:
+            "Unable to extract text from PDF. The file might be scanned or empty.",
+        });
+
+    // 2. Prepare Context
+    const userPrompt = `
+      Analyze this resume based on the following context:
+      ## Reference Data
+      Industry Benchmarks: ${JSON.stringify(INDUSTRY_BENCHMARKS)}
+      ATS Keywords: ${JSON.stringify(ATS_KEYWORDS)}
+      ## Resume Content
+      ${text}
+    `;
+
+    // 3. AI Analysis
+    const completion = await client.chat.completions.create({
+      model: LLM_MODEL,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.7,
     });
-    if (!response.ok) {
-      const errorMessage = await response.text();
-      console.error("API Error:", errorMessage);
-      throw new Error(`API request failed: ${errorMessage}`);
-    }
-    const completion = await response.json();
-    console.log("Raw AI Response:", completion);
-    const responseContent = completion?.generations?.[0]?.text || "";
-    if (!responseContent) {
-      throw new Error("Empty or invalid response content");
-    }
+
+    let responseContent = completion.choices[0].message.content;
+    if (!responseContent) throw new Error("Empty response from AI Provider");
+
+    // Clean potential markdown before parsing
+    responseContent = cleanJson(responseContent);
 
     let analysis;
     try {
       analysis = JSON.parse(responseContent);
-      console.log("Parsed AI Response:", analysis);
-    } catch (error) {
-      console.error("Failed to parse AI response:", error);
-      console.log("Raw response:", responseContent);
-      res.status(500).json({
-        error: "Failed to parse AI response",
-        details: error.message,
+    } catch (parseError) {
+      console.error("JSON Parse Error. Raw content:", responseContent);
+      return res
+        .status(500)
+        .json({
+          error:
+            "Failed to parse AI response. The model output was not valid JSON.",
+        });
+    }
+
+    // 4. Score Calculation
+    if (analysis.score) {
+      const { scaledScores, totalScore } = calculateWeightedScores(
+        analysis.score.breakdown,
+      );
+      analysis.score.breakdown = scaledScores;
+      analysis.score.total = totalScore;
+    } else {
+      analysis.score = { total: 0, breakdown: {} };
+    }
+
+    // 5. Smart Job Search Integration
+    const hasLocation =
+      analysis.location &&
+      !["unspecified", "unknown", "n/a", "none"].includes(
+        analysis.location.toLowerCase(),
+      );
+
+    if (hasLocation || analysis.skills_analysis?.strong_skills) {
+      // Logic Improvement: Use the detected Job Title + Top Skill for better results
+      // E.g. "Software Engineer Java" is better than "Java, Python, C++"
+      const roleTitle = analysis.roles?.[0]?.title || "";
+      const topSkill = analysis.skills_analysis?.strong_skills?.[0] || "";
+
+      let searchKeyword;
+      if (roleTitle && topSkill) {
+        searchKeyword = `${roleTitle} ${topSkill}`;
+      } else {
+        searchKeyword =
+          analysis.skills_analysis?.strong_skills?.slice(0, 3).join(" ") ||
+          "General";
+      }
+
+      const jobQuery = {
+        keyword: searchKeyword,
+        location: hasLocation ? analysis.location : "",
+        experienceLevel: analysis.experience_level || "Entry Level",
+        limit: 5,
+        page: "0",
+      };
+
+      console.log(
+        `Searching jobs for: "${jobQuery.keyword}" in "${jobQuery.location}"`,
+      );
+
+      analysis.job_search_results = await query(jobQuery).catch((err) => {
+        console.error("Job search failed (non-fatal):", err.message);
+        return [];
       });
-      return;
     }
-    if (!analysis.score?.breakdown) {
-      throw new Error("Missing score breakdown in the response");
-    }
-    const { scaledScores, totalScore } = scaleScores(analysis.score.breakdown);
-    analysis.score.breakdown = scaledScores;
-    analysis.score.total = totalScore;
-    const jobQuery = {
-      keyword: analysis.skills_analysis.strong_skills.join(", "),
-      location: analysis.location,
-      experienceLevel: analysis.experience_level,
-      limit: 5,
-      page: "0",
-    };
-    if (
-      analysis.location != null ||
-      analysis.location != "Unspecified" ||
-      analysis.skills_analysis.strong_skills
-    ) {
-      const jobSearchResults = await searchJobs(jobQuery);
-      analysis.job_search_results = jobSearchResults;
-    }
+
     res.json(analysis);
   } catch (error) {
-    console.error("Error:", error);
-    res.status(500).json({
-      error: "Analysis failed",
-      details: error.message,
-    });
+    console.error("Server Error:", error);
+    res.status(500).json({ error: "Analysis failed", details: error.message });
   }
 });
 
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, "0.0.0.0", () =>
-  console.log(`Server running on port ${PORT}`)
+  console.log(`Server running on port ${PORT}`),
 );
