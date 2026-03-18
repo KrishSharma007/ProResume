@@ -108,9 +108,9 @@ const Loader = () => (
         </div>
         <div className="text-lg sm:text-xl text-purple-200 text-center">
           Analyzing your resume... <br />
-          <span className="text-sm text-purple-400 mt-2 block">
+          {/* <span className="text-sm text-purple-400 mt-2 block">
             Made with ❤️ by -Krish 🥷
-          </span>
+          </span> */}
         </div>
       </div>
     </div>
@@ -283,6 +283,15 @@ export default function ResumeAnalyzer() {
 
         {/* Main Content */}
         <div className="relative z-10">
+           <center>
+      <a href="YOUR_PAPER_URL"
+  target="_blank"
+  rel="noopener noreferrer"
+  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-purple-300 hover:text-purple-100 hover:bg-purple-500/10 transition-colors"
+>
+  Research Paper
+  <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+</a>
           <Hero funcUpload={fileUp} loading={loading} />
 
           {loading && <Loader />}
